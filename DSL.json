@@ -1,0 +1,91 @@
+{
+    "infra":{
+        "platform": "k8s",
+        "service_mesh": "istio",
+        "traces": "jaeger",
+        "metrics": "prometheus",
+        "workload_generator":{
+            "tool": "wrk",
+            "config": {
+                "threads": 4,
+                "connections": 100,
+                "duration": "30s",
+                "url": "http://localhost:8080",
+                "scripts": {
+                    "path": "scripts/",
+                    "files": ["script1.lua", "script2.lua"]
+                }
+            }
+        }
+    },
+    "services":[
+        {
+            "service_name": "s0",
+            "application": "db/cache/compute/...",
+            "deployment": {
+                "replicas": 1,
+                "cpu_requests": "1000m",
+                "cpu_limits": "1000m",
+                "memory_requests": "1Gi",
+                "memory_limits": "1Gi",
+                "pod_affinity": false,
+                "annotations": {
+                    "istio_sidecar_inject": "true"
+                }
+            },
+            "spec": {
+                "language": "go",
+                "threading_model": "single-threaded",
+                "threads": 16
+            },
+            "endpoints": {
+                "stressor":[
+                    {   
+                        "type": "cpu",
+                        "config":{
+                            "processing_time": 1000,
+                            "threads": 1
+                        },
+                        "concurrency_level": 1
+                    },
+                    {
+                        "type": "memory",
+                        "config":{
+                            "allocation_size": 1000
+                        },
+                        "concurrency_level": 2
+                    },
+                    {
+                        "type": "network",
+                        "config":{
+                            "called_service": [
+                                {
+                                    "service_name": "s1",
+                                    "endpoint": "e1",
+                                    "ratio": 1,
+                                    "protocol": "http",
+                                    "payload": "",
+                                    "condition":
+                                    {
+                                        "type": "probability",
+                                        "value": 100
+                                    },
+                                    "sync": true
+                                }
+                            ]
+                        },
+                        "concurrency_level": 2
+                    },
+                    {
+                        "type": "disk",
+                        "config":{
+                            "read_size": 1000,
+                            "write_size": 1000
+                        },
+                        "concurrency_level": 3
+                    }
+                ]
+            }
+        }
+    ]
+}
