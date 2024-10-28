@@ -1,9 +1,30 @@
 {
     "infra":{
-        "platform": "k8s",
+        "platform": {
+            "name": "k8s",
+            "parameters": {
+                "prefix_yaml_file":"bamboo",
+                "namespace": "default",
+                "image": "msvcbench/microservice_v6-screen:latest",
+                "cluster_domain": "cluster",
+                "path": "/api/v1",
+                "sleep": 1,
+                "dns-resolver":"kube-dns.kube-system.svc.cluster.local",
+                "scheduler-name": "default-scheduler",
+                "nginx-gw": true,
+                "nginx-svc-type": "NodePort",
+                "no-apply": false
+            }
+        },
         "service_mesh": "istio",
-        "traces": "jaeger",
-        "metrics": "prometheus",
+        "traces": {
+            "tool": "jaeger",
+            "sampling_rate": 0.1
+        },
+        "metrics":{
+            "tool" : "prometheus",
+            "config" : "your_config.yml"
+        },
         "workload_generator":{
             "tool": "wrk",
             "config": {
@@ -14,6 +35,11 @@
                 "scripts": {
                     "path": "scripts/",
                     "files": ["script1.lua", "script2.lua"]
+                },
+                "header": {
+                    "header" : "User-Agent: wrk",
+                    "latency" : true,
+                    "timeout" : true
                 }
             }
         }
@@ -30,7 +56,9 @@
                 "memory_limits": "1Gi",
                 "pod_affinity": false,
                 "annotations": {
-                    "istio_sidecar_inject": "true"
+                    "istio_sidecar_inject": "true",
+                    "sidecar.istio.io/retry": "3",
+                    "sidecar.istio.io/timeout": "5s"
                 }
             },
             "spec": {
@@ -64,13 +92,14 @@
                                     "endpoint": "e1",
                                     "ratio": 1,
                                     "protocol": "http",
-                                    "payload": "",
+                                    "payload_size": "",
                                     "condition":
                                     {
                                         "type": "probability",
                                         "value": 100
                                     },
-                                    "sync": true
+                                    "sync": true,
+                                    "timeout": "3s"
                                 }
                             ]
                         },
@@ -83,6 +112,54 @@
                             "write_size": 1000
                         },
                         "concurrency_level": 3
+                    }
+                ]
+            }
+        },
+        {
+            "service_name": "db0",
+            "application": "db/cache/compute/...",
+            "deployment": {
+                "replicas": 1,
+                "cpu_requests": "1000m",
+                "cpu_limits": "1000m",
+                "memory_requests": "1Gi",
+                "memory_limits": "1Gi",
+                "pod_affinity": false,
+                "annotations": {
+                    "istio_sidecar_inject": "true",
+                    "sidecar.istio.io/retry": "3",
+                    "sidecar.istio.io/timeout": "5s"
+                }
+            },
+            "spec": {
+                "language": "go",
+                "threading_model": "single-threaded",
+                "threads": 16
+            },
+            "endpoints": {
+                "stressor":[
+                    {   
+                        "type": "cpu",
+                        "config":{
+                            "processing_time": 1000,
+                            "threads": 1
+                        },
+                        "concurrency_level": 1
+                    },
+                    {
+                        "type": "memory",
+                        "config":{
+                            "allocation_size": 1000
+                        },
+                        "concurrency_level": 2
+                    },
+                    {
+                        "type": "network",
+                        "config":{
+                            "called_service": []
+                        },
+                        "concurrency_level": 2
                     }
                 ]
             }
